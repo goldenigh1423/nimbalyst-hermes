@@ -1,15 +1,8 @@
 @echo off
 REM ============================================
-REM Nimbalyst + Hermes Agent - Instalador Simple
+REM Nimbalyst + Hermes Agent - Instalador Automatico
 REM ============================================
-REM Ejecutar: instalar.bat
-REM
-REM Esto hace:
-REM   1. Descarga Nimbalyst oficial
-REM   2. Copia el extension Hermes Agent
-REM   3. Abre Nimbalyst
-REM
-REM Requisitos: Ninguno (descarga todo)
+REM Ejecutar: .\instalar.bat
 
 echo.
 echo =============================================
@@ -18,69 +11,82 @@ echo =============================================
 echo.
 
 REM Crear directorio de trabajo
-set INSTALL_DIR=%USERPROFILE%\nimbalyst-hermes
-mkdir "%INSTALL_DIR%" 2>nul
-cd /d "%INSTALL_DIR%"
+set WORK_DIR=%USERPROFILE%\nimbalyst-hermes
+mkdir "%WORK_DIR%" 2>nul
+cd /d "%WORK_DIR%"
 
-REM [1/5] Descargar Nimbalyst
-echo [1/5] Descargando Nimbalyst...
+REM [1/4] Descargar Nimbalyst
+echo [1/4] Descargando Nimbalyst v0.73.2...
 echo.
-echo   Ve a: https://nimbalyst.com/releases
-echo   Descarga el instalador para Windows (.exe)
-echo   e instalalo normalmente.
-echo.
-echo   Cuando termine la instalacion, presiona ENTER aqui.
-echo.
-pause
 
-REM [2/5] Buscar instalacion de Nimbalyst
-echo.
-echo [2/5] Buscando Nimbalyst instalado...
+REM Detectar arquitectura
+if "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
+    set EXE_URL=https://github.com/nimbalyst/nimbalyst/releases/download/v0.73.2/Nimbalyst-Windows-arm64.exe
+    set EXE_NAME=Nimbalyst-Windows-arm64.exe
+) else (
+    set EXE_URL=https://github.com/nimbalyst/nimbalyst/releases/download/v0.73.2/Nimbalyst-Windows-x64.exe
+    set EXE_NAME=Nimbalyst-Windows-x64.exe
+)
 
+echo   Descargando %EXE_NAME%...
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%EXE_URL%' -OutFile '%WORK_DIR%\%EXE_NAME%'"
+
+if exist "%WORK_DIR%\%EXE_NAME%" (
+    echo   [OK] Descargado: %EXE_NAME%
+) else (
+    echo   [ERROR] No se pudo descargar.
+    echo   Descarga manualmente desde: https://github.com/nimbalyst/nimbalyst/releases/latest
+    pause
+    exit /b 1
+)
+
+REM [2/4] Instalar Nimbalyst
+echo.
+echo [2/4] Instalando Nimbalyst...
+echo   Ejecutando instalador (sigue las instrucciones en pantalla)...
+start /wait "%WORK_DIR%\%EXE_NAME%"
+
+echo   [OK] Nimbalyst instalado
+
+REM [3/4] Descargar e instalar extension Hermes
+echo.
+echo [3/4] Instalando extension Hermes Agent...
+
+REM Descargar extension desde GitHub
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/goldenigh1423/nimbalyst-hermes/archive/refs/heads/master.zip' -OutFile '%WORK_DIR%\hermes-ext.zip'"
+powershell -Command "Expand-Archive -Path '%WORK_DIR%\hermes-ext.zip' -DestinationPath '%WORK_DIR%' -Force"
+
+REM Buscar donde se instalo Nimbalyst
 set NIMBALYST_DIR=
+if exist "%LOCALAPPDATA%\Programs\nimbalyst" set NIMBALYST_DIR=%LOCALAPPDATA%\Programs\nimbalyst
 if exist "%LOCALAPPDATA%\nimbalyst" set NIMBALYST_DIR=%LOCALAPPDATA%\nimbalyst
 if exist "%PROGRAMFILES%\nimbalyst" set NIMBALYST_DIR=%PROGRAMFILES%\nimbalyst
-if exist "%PROGRAMFILES(x86)%\nimbalyst" set NIMBALYST_DIR=%PROGRAMFILES(x86)%\nimbalyst
 
-if "%NIMBALYST_DIR%"=="" (
-    echo   No se encontro Nimbalyst automaticamente.
-    echo   Copia la ruta donde instalaste Nimbalyst:
-    set /p NIMBALYST_DIR="   Ruta: "
+REM Buscar resources\extensions
+set EXT_DEST=
+if exist "%NIMBALYST_DIR%\resources\extensions" set EXT_DEST=%NIMBALYST_DIR%\resources\extensions
+
+if "%EXT_DEST%"=="" (
+    echo   Buscando instalacion de Nimbalyst...
+    for /d %%d in ("%LOCALAPPDATA%\Programs\nimbalyst*" "%LOCALAPPDATA%\nimbalyst*" "%PROGRAMFILES%\nimbalyst*") do (
+        if exist "%%d\resources\extensions" set EXT_DEST=%%d\resources\extensions
+    )
 )
 
-echo   [OK] Nimbalyst en: %NIMBALYST_DIR%
-
-REM [3/5] Descargar extension Hermes
-echo.
-echo [3/5] Descargando extension Hermes Agent...
-
-cd /d "%INSTALL_DIR%"
-
-REM Descargar desde GitHub
-where git >nul 2>&1
-if %errorlevel%==0 (
-    git clone https://github.com/goldenigh1423/nimbalyst-hermes.git
+if "%EXT_DEST%"=="" (
+    echo   No se encontro la carpeta de extensiones automaticamente.
+    echo   Copia manualmente la carpeta:
+    echo     %WORK_DIR%\nimbalyst-hermes-master\code\hermes-agent-nimbalyst
+    echo   A la carpeta 'resources\extensions\hermes-agent' dentro de Nimbalyst.
 ) else (
-    echo   git no encontrado. Descargando ZIP...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/goldenigh1423/nimbalyst-hermes/archive/refs/heads/master.zip' -OutFile 'nimbalyst-hermes.zip'"
-    powershell -Command "Expand-Archive -Path 'nimbalyst-hermes.zip' -DestinationPath '.'"
-    ren nimbalyst-hermes-master nimbalyst-hermes
+    mkdir "%EXT_DEST%\hermes-agent" 2>nul
+    xcopy /e /i /y "%WORK_DIR%\nimbalyst-hermes-master\code\hermes-agent-nimbalyst\*" "%EXT_DEST%\hermes-agent" >nul
+    echo   [OK] Extension instalado en: %EXT_DEST%\hermes-agent
 )
 
-echo   [OK] Extension descargado
-
-REM [4/5] Copiar extension
+REM [4/4] Configurar SSH
 echo.
-echo [4/5] Instalando extension en Nimbalyst...
-
-set EXT_DIR=%NIMBALYST_DIR%\resources\extensions\hermes-agent
-mkdir "%EXT_DIR%" 2>nul
-xcopy /e /i /y "%INSTALL_DIR%\nimbalyst-hermes\code\hermes-agent-nimbalyst\*" "%EXT_DIR%" >nul
-echo   [OK] Extension instalado
-
-REM [5/5] Configurar SSH
-echo.
-echo [5/5] Configurando SSH al VPS...
+echo [4/4] Configurando SSH al VPS...
 
 set CONFIG_DIR=%USERPROFILE%\.nimbalyst\extensions\hermes-agent
 mkdir "%CONFIG_DIR%" 2>nul
@@ -96,15 +102,20 @@ echo   "hermesProfile": "coder"
 echo }
 ) > "%CONFIG_DIR%\config.json"
 
-echo   [OK] Configuracion creada
+echo   [OK] Configuracion creada en: %CONFIG_DIR%\config.json
+
+REM Limpiar
+del "%WORK_DIR%\hermes-ext.zip" 2>nul
+del "%WORK_DIR%\%EXE_NAME%" 2>nul
+rmdir /s /q "%WORK_DIR%\nimbalyst-hermes-master" 2>nul
 
 REM Resultado
 echo.
 echo =============================================
-echo   Listo!
+echo   Instalacion completada!
 echo =============================================
 echo.
-echo   1. Abre Nimbalyst
+echo   1. Abre Nimbalyst (buscalo en el menu inicio)
 echo   2. Settings - Extensions
 echo   3. Habilita "Hermes Agent"
 echo   4. Nueva sesion - Selecciona "Hermes Agent"

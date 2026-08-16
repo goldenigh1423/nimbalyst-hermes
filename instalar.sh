@@ -1,13 +1,8 @@
 #!/bin/bash
 # ============================================
-# Nimbalyst + Hermes Agent - Instalador Simple
+# Nimbalyst + Hermes Agent - Instalador Automatico
 # ============================================
 # Ejecutar: bash instalar.sh
-#
-# Esto hace:
-#   1. Descarga Nimbalyst oficial
-#   2. Copia el extension Hermes Agent
-#   3. Abre Nimbalyst
 
 set -e
 
@@ -18,73 +13,74 @@ echo "============================================="
 echo ""
 
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 NC='\033[0m'
 ok() { echo -e "${GREEN}✓${NC} $1"; }
+fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-INSTALL_DIR="$HOME/nimbalyst-hermes"
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
+WORK_DIR="$HOME/nimbalyst-hermes"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
-# [1/5] Descargar Nimbalyst
-echo "[1/5] Descargando Nimbalyst..."
-echo ""
-echo "  Ve a: https://nimbalyst.com/releases"
-echo "  Descarga el .AppImage para Linux"
-echo ""
-echo "  Cuando lo tengas, copialo a: $INSTALL_DIR/"
-echo ""
-read -p "  Presiona ENTER cuando este listo..."
+# [1/4] Descargar Nimbalyst
+echo "[1/4] Descargando Nimbalyst v0.73.2..."
 
-# Buscar AppImage
-APPIMAGE=$(ls "$INSTALL_DIR"/*.AppImage 2>/dev/null | head -1)
-if [ -n "$APPIMAGE" ]; then
-    ok "Nimbalyst encontrado: $APPIMAGE"
-    chmod +x "$APPIMAGE"
+ARCH=$(uname -m)
+if [ "$ARCH" = "x86_64" ]; then
+    APPIMAGE_URL="https://github.com/nimbalyst/nimbalyst/releases/download/v0.73.2/Nimbalyst-Linux.AppImage"
+    APPIMAGE_NAME="Nimbalyst-Linux.AppImage"
+elif [ "$ARCH" = "aarch64" ]; then
+    APPIMAGE_URL="https://github.com/nimbalyst/nimbalyst/releases/download/v0.73.2/Nimbalyst-Linux-arm64.AppImage"
+    APPIMAGE_NAME="Nimbalyst-Linux-arm64.AppImage"
 else
-    echo "  No se encontro .AppImage en $INSTALL_DIR/"
-    echo "  Asegurate de que el archivo este ahi."
-    exit 1
+    fail "Arquitectura no soportada: $ARCH"
 fi
 
-# [2/5] Descargar extension
-echo ""
-echo "[2/5] Descargando extension Hermes Agent..."
+echo "  Descargando $APPIMAGE_NAME..."
+curl -L -o "$WORK_DIR/$APPIMAGE_NAME" "$APPIMAGE_URL" 2>&1 | tail -1
+chmod +x "$WORK_DIR/$APPIMAGE_NAME"
+ok "Descargado: $APPIMAGE_NAME"
 
-if command -v git >/dev/null 2>&1; then
-    git clone https://github.com/goldenigh1423/nimbalyst-hermes.git 2>/dev/null || cd nimbalyst-hermes && git pull && cd ..
-else
-    echo "  git no encontrado. Instalando..."
-    sudo apt-get install -y git
-    git clone https://github.com/goldenigh1423/nimbalyst-hermes.git
-fi
+# [2/4] Descargar extension
+echo ""
+echo "[2/4] Descargando extension Hermes Agent..."
+
+curl -L -o "$WORK_DIR/hermes-ext.zip" "https://github.com/goldenigh1423/nimbalyst-hermes/archive/refs/heads/master.zip" 2>&1 | tail -1
+unzip -q -o "$WORK_DIR/hermes-ext.zip" -d "$WORK_DIR/"
 ok "Extension descargado"
 
-# [3/5] Extraer AppImage e instalar extension
+# [3/4] Extraer AppImage y copiar extension
 echo ""
-echo "[3/5] Instalando extension..."
+echo "[3/4] Instalando extension en Nimbalyst..."
 
-# Extraer AppImage
-cd "$INSTALL_DIR"
-"$APPIMAGE" --appimage-extract 2>/dev/null || true
+cd "$WORK_DIR"
+"./$APPIMAGE_NAME" --appimage-extract >/dev/null 2>&1
 
 if [ -d "squashfs-root" ]; then
-    # Copiar extension
     EXT_DIR="squashfs-root/resources/extensions/hermes-agent"
     mkdir -p "$EXT_DIR"
-    cp -r nimbalyst-hermes/code/hermes-agent-nimbalyst/* "$EXT_DIR/"
-    ok "Extension instalado en AppImage"
+    cp -r nimbalyst-hermes-master/code/hermes-agent-nimbalyst/* "$EXT_DIR/"
+    ok "Extension instalado"
 
-    # Repack AppImage (opcional, o se puede ejecutar desde squashfs-root)
-    echo "  Para ejecutar: $INSTALL_DIR/squashfs-root/AppRun"
+    # Crear shortcut
+    DESKTOP_FILE="$HOME/.local/share/applications/nimbalyst-hermes.desktop"
+    mkdir -p "$(dirname "$DESKTOP_FILE")"
+    cat > "$DESKTOP_FILE" << EOF
+[Desktop Entry]
+Name=Nimbalyst + Hermes
+Exec=$WORK_DIR/squashfs-root/AppRun
+Icon=$WORK_DIR/squashfs-root/nimbalyst
+Type=Application
+Categories=Development;
+EOF
+    ok "Shortcut creado en el menu de aplicaciones"
 else
-    echo "  No se pudo extraer el AppImage"
-    echo "  Intenta ejecutar manualmente:"
-    echo "    $APPIMAGE --appimage-extract"
+    fail "No se pudo extraer el AppImage"
 fi
 
-# [4/5] Configurar SSH
+# [4/4] Configurar SSH
 echo ""
-echo "[4/5] Configurando SSH..."
+echo "[4/4] Configurando SSH..."
 
 CONFIG_DIR="$HOME/.nimbalyst/extensions/hermes-agent"
 mkdir -p "$CONFIG_DIR"
@@ -101,29 +97,29 @@ cat > "$CONFIG_DIR/config.json" << EOF
 EOF
 ok "Configuracion SSH creada"
 
-# [5/5] SSH setup
-echo ""
-echo "[5/5] Verificando SSH..."
-
+# Verificar SSH
 if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@169.58.56.108 "hermes --version" >/dev/null 2>&1; then
     ok "SSH al VPS funciona"
 else
-    echo "  SSH no configurado. Para configurar:"
+    echo "  SSH no configurado. Ejecuta:"
     echo "    ssh-keygen -t ed25519"
     echo "    ssh-copy-id root@169.58.56.108"
 fi
 
+# Limpiar
+rm -f "$WORK_DIR/hermes-ext.zip"
+rm -rf "$WORK_DIR/nimbalyst-hermes-master"
+
 # Resultado
 echo ""
 echo "============================================="
-echo "  Listo!"
+echo "  Instalacion completada!"
 echo "============================================="
 echo ""
 echo "  Ejecutar Nimbalyst:"
-echo "    $INSTALL_DIR/squashfs-root/AppRun"
+echo "    $WORK_DIR/squashfs-root/AppRun"
 echo ""
-echo "  O directamente:"
-echo "    $APPIMAGE"
+echo "  O busca 'Nimbalyst + Hermes' en tu menu."
 echo ""
 echo "  Despues de abrir:"
 echo "    1. Settings -> Extensions"
