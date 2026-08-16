@@ -1,60 +1,22 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// src/index.tsx
-var index_exports = {};
-__export(index_exports, {
-  HermesAgentSettings: () => HermesAgentSettings,
-  activate: () => activate,
-  components: () => components,
-  deactivate: () => deactivate
-});
-module.exports = __toCommonJS(index_exports);
-
 // src/components/HermesAgentSettings.tsx
-var import_react = __toESM(require("react"));
+import React, { useState } from "react";
 function HermesAgentSettings({ config, onConfigChange }) {
-  const [connectionMode, setConnectionMode] = (0, import_react.useState)(
+  const [connectionMode, setConnectionMode] = useState(
     config.connectionMode || "local"
   );
-  const [sshHost, setSshHost] = (0, import_react.useState)(config.sshHost || "");
-  const [sshUser, setSshUser] = (0, import_react.useState)(config.sshUser || "root");
-  const [sshKeyPath, setSshKeyPath] = (0, import_react.useState)(
+  const [sshHost, setSshHost] = useState(config.sshHost || "");
+  const [sshUser, setSshUser] = useState(config.sshUser || "root");
+  const [sshKeyPath, setSshKeyPath] = useState(
     config.sshKeyPath || "~/.ssh/id_rsa"
   );
-  const [hermesBinary, setHermesBinary] = (0, import_react.useState)(
+  const [hermesBinary, setHermesBinary] = useState(
     config.hermesBinary || "hermes"
   );
-  const [hermesProfile, setHermesProfile] = (0, import_react.useState)(
+  const [hermesProfile, setHermesProfile] = useState(
     config.hermesProfile || "coder"
   );
-  const [testResult, setTestResult] = (0, import_react.useState)(null);
-  const [testing, setTesting] = (0, import_react.useState)(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
   const handleTest = async () => {
     setTesting(true);
     setTestResult(null);
@@ -66,7 +28,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       setTesting(false);
     }
   };
-  return /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px", maxWidth: "500px" } }, /* @__PURE__ */ import_react.default.createElement("h3", { style: { marginBottom: "16px" } }, "Hermes Agent Configuration"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Connection Mode"), /* @__PURE__ */ import_react.default.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "16px", maxWidth: "500px" } }, /* @__PURE__ */ React.createElement("h3", { style: { marginBottom: "16px" } }, "Hermes Agent Configuration"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Connection Mode"), /* @__PURE__ */ React.createElement(
     "select",
     {
       value: connectionMode,
@@ -76,9 +38,9 @@ function HermesAgentSettings({ config, onConfigChange }) {
       },
       style: { width: "100%", padding: "6px 8px" }
     },
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "local" }, "Local (hermes installed locally)"),
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "ssh" }, "SSH (connect to remote VPS)")
-  ), /* @__PURE__ */ import_react.default.createElement("p", { style: { fontSize: "12px", color: "#888", marginTop: "4px" } }, connectionMode === "local" ? "Runs hermes binary directly on this machine." : "Connects to a remote VPS via SSH and runs hermes there.")), connectionMode === "ssh" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH Host"), /* @__PURE__ */ import_react.default.createElement(
+    /* @__PURE__ */ React.createElement("option", { value: "local" }, "Local (hermes installed locally)"),
+    /* @__PURE__ */ React.createElement("option", { value: "ssh" }, "SSH (connect to remote VPS)")
+  ), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "12px", color: "#888", marginTop: "4px" } }, connectionMode === "local" ? "Runs hermes binary directly on this machine." : "Connects to a remote VPS via SSH and runs hermes there.")), connectionMode === "ssh" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH Host"), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -90,7 +52,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       placeholder: "169.58.56.108",
       style: { width: "100%", padding: "6px 8px" }
     }
-  )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH User"), /* @__PURE__ */ import_react.default.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH User"), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -102,7 +64,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       placeholder: "root",
       style: { width: "100%", padding: "6px 8px" }
     }
-  )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH Key Path"), /* @__PURE__ */ import_react.default.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "SSH Key Path"), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -114,7 +76,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       placeholder: "~/.ssh/id_rsa",
       style: { width: "100%", padding: "6px 8px" }
     }
-  ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Hermes Binary Path"), /* @__PURE__ */ import_react.default.createElement(
+  ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Hermes Binary Path"), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "text",
@@ -126,7 +88,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       placeholder: "hermes",
       style: { width: "100%", padding: "6px 8px" }
     }
-  )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ import_react.default.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Hermes Profile"), /* @__PURE__ */ import_react.default.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "12px" } }, /* @__PURE__ */ React.createElement("label", { style: { display: "block", marginBottom: "4px", fontWeight: 600 } }, "Hermes Profile"), /* @__PURE__ */ React.createElement(
     "select",
     {
       value: hermesProfile,
@@ -136,11 +98,11 @@ function HermesAgentSettings({ config, onConfigChange }) {
       },
       style: { width: "100%", padding: "6px 8px" }
     },
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "default" }, "Default"),
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "coder" }, "Coder"),
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "planner" }, "Planner"),
-    /* @__PURE__ */ import_react.default.createElement("option", { value: "auditor" }, "Auditor")
-  )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: "16px" } }, /* @__PURE__ */ import_react.default.createElement(
+    /* @__PURE__ */ React.createElement("option", { value: "default" }, "Default"),
+    /* @__PURE__ */ React.createElement("option", { value: "coder" }, "Coder"),
+    /* @__PURE__ */ React.createElement("option", { value: "planner" }, "Planner"),
+    /* @__PURE__ */ React.createElement("option", { value: "auditor" }, "Auditor")
+  )), /* @__PURE__ */ React.createElement("div", { style: { marginTop: "16px" } }, /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: handleTest,
@@ -155,7 +117,7 @@ function HermesAgentSettings({ config, onConfigChange }) {
       }
     },
     testing ? "Testing..." : "Test Connection"
-  )), testResult && /* @__PURE__ */ import_react.default.createElement(
+  )), testResult && /* @__PURE__ */ React.createElement(
     "div",
     {
       style: {
@@ -180,10 +142,9 @@ async function deactivate() {
 var components = {
   HermesAgentSettings
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
+export {
   HermesAgentSettings,
   activate,
   components,
   deactivate
-});
+};
