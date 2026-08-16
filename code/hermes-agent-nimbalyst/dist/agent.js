@@ -31,9 +31,6 @@ var HermesProtocol = class {
     this.config = config;
     console.log(`[Hermes Agent] Protocol initialized (mode: ${config.connectionMode})`);
   }
-  // ============================================
-  // Session Management
-  // ============================================
   async createSession(options) {
     const sessionId = `hermes-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     console.log(`[Hermes Agent] Creating session: ${sessionId}`);
@@ -44,53 +41,39 @@ var HermesProtocol = class {
       config: { ...this.config },
       eventBuffer: [],
       resolveNext: null,
-      done: false
+      done: false,
+      currentMode: "idle"
     };
     this.sessions.set(sessionId, session);
     return session;
   }
   async resumeSession(sessionId, options) {
-    console.log(`[Hermes Agent] Resuming session: ${sessionId}`);
     const session = this.sessions.get(sessionId);
-    if (session) {
-      return session;
-    }
+    if (session) return session;
     return this.createSession(options);
   }
   async forkSession(sessionId, options) {
-    console.log(`[Hermes Agent] Fork not supported, creating new session`);
     return this.createSession(options);
   }
-  // ============================================
-  // Message Sending
-  // ============================================
   async *sendMessage(session, message) {
     const hermesSession = session;
     console.log(`[Hermes Agent] Sending message to session ${session.id}`);
-    if (!hermesSession.process) {
-      hermesSession.process = await this.startHermesProcess(hermesSession, message);
-      this.setupProcessEvents(hermesSession);
-    }
-    const msg = message.content.replace(/\n/g, "\\n");
-    hermesSession.process.stdin?.write(message.content + "\n");
+    const proc = this.spawnHermes(hermesSession, message.content);
+    hermesSession.process = proc;
     hermesSession.done = false;
     hermesSession.eventBuffer = [];
     hermesSession.resolveNext = null;
+    this.setupProcessEvents(hermesSession);
     yield* this.consumeEvents(hermesSession);
   }
-  // ============================================
-  // Abort / Cleanup
-  // ============================================
   abortSession(session) {
     const hermesSession = session;
-    console.log(`[Hermes Agent] Aborting session: ${session.id}`);
     if (hermesSession.process) {
       hermesSession.process.kill("SIGINT");
     }
   }
   cleanupSession(session) {
     const hermesSession = session;
-    console.log(`[Hermes Agent] Cleaning up session: ${session.id}`);
     if (hermesSession.process) {
       hermesSession.process.kill("SIGTERM");
       hermesSession.process = null;
@@ -98,45 +81,47 @@ var HermesProtocol = class {
     this.sessions.delete(session.id);
   }
   // ============================================
-  // Process Management
+  // Process Spawning
   // ============================================
-  async startHermesProcess(session, message) {
+  spawnHermes(session, message) {
     const { config } = session;
-    const workspace = message.sessionId || config.workspacePath || process.cwd();
     if (config.connectionMode === "ssh") {
-      return this.startSSHProcess(config, workspace);
+      return this.spawnSSH(config, message);
     } else {
-      return this.startLocalProcess(config, workspace);
+      return this.spawnLocal(config, message);
     }
   }
-  startLocalProcess(config, workspace) {
+  spawnLocal(config, message) {
     const args = [
       "chat",
-      "--json",
+      "-q",
+      message,
       "-p",
-      config.hermesProfile,
-      "--in",
-      workspace
+      config.hermesProfile
     ];
-    console.log(`[Hermes Agent] Starting local: ${config.hermesBinary} ${args.join(" ")}`);
+    if (config.workspacePath) {
+      args.push("--in", config.workspacePath);
+    }
+    console.log(`[Hermes Agent] Local: ${config.hermesBinary} ${args.join(" ")}`);
     return (0, import_child_process.spawn)(config.hermesBinary, args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      cwd: workspace
+      stdio: ["pipe", "pipe", "pipe"]
     });
   }
-  startSSHProcess(config, workspace) {
-    const hermesCmd = `${config.hermesBinary} chat --json -p ${config.hermesProfile} --in ${workspace}`;
+  spawnSSH(config, message) {
+    const escapedMessage = message.replace(/'/g, "'\\''");
+    const hermesCmd = `${config.hermesBinary} chat -q '${escapedMessage}' -p ${config.hermesProfile}`;
     const sshArgs = [
       "-o",
       "StrictHostKeyChecking=no",
       "-o",
       "ConnectTimeout=10",
-      "-i",
-      config.sshKeyPath,
       `${config.sshUser}@${config.sshHost}`,
       hermesCmd
     ];
-    console.log(`[Hermes Agent] Starting SSH: ssh ${sshArgs.join(" ")}`);
+    if (config.sshKeyPath) {
+      sshArgs.splice(0, 0, "-i", config.sshKeyPath);
+    }
+    console.log(`[Hermes Agent] SSH: ssh ${sshArgs.join(" ")}`);
     return (0, import_child_process.spawn)("ssh", sshArgs, {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -147,32 +132,32 @@ var HermesProtocol = class {
   setupProcessEvents(session) {
     const proc = session.process;
     if (!proc) return;
-    let buffer = "";
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
     proc.stdout?.on("data", (data) => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const event = this.parseEvent(line);
-        if (event) {
-          session.eventBuffer.push(event);
-          session.resolveNext?.();
-        }
-      }
+      stdoutBuffer += data.toString();
     });
     proc.stderr?.on("data", (data) => {
-      const text = data.toString().trim();
-      if (text) {
-        session.eventBuffer.push({
-          type: "text",
-          content: text + "\n"
-        });
-        session.resolveNext?.();
-      }
+      stderrBuffer += data.toString();
     });
     proc.on("exit", (code) => {
       console.log(`[Hermes Agent] Process exited with code ${code}`);
+      if (stdoutBuffer.trim()) {
+        session.eventBuffer.push({
+          type: "text",
+          content: stdoutBuffer
+        });
+      }
+      if (stderrBuffer.trim()) {
+        session.eventBuffer.push({
+          type: "text",
+          content: stderrBuffer
+        });
+      }
+      session.eventBuffer.push({
+        type: "complete",
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
+      });
       session.done = true;
       session.resolveNext?.();
     });
@@ -185,83 +170,6 @@ var HermesProtocol = class {
       session.done = true;
       session.resolveNext?.();
     });
-  }
-  parseEvent(line) {
-    try {
-      const data = JSON.parse(line);
-      switch (data.type) {
-        case "text":
-        case "content_block_delta":
-          return {
-            type: "text",
-            content: data.text || data.delta?.text || ""
-          };
-        case "tool_call":
-        case "tool_use":
-          return {
-            type: "tool_call",
-            toolCall: {
-              id: data.id || `tool-${Date.now()}`,
-              name: data.name || data.tool_name || "",
-              arguments: data.input || data.arguments || {}
-            }
-          };
-        case "tool_result":
-        case "tool_result_content":
-          return {
-            type: "tool_result",
-            toolResult: {
-              id: data.id,
-              name: data.name || data.tool_name || "",
-              result: {
-                success: true,
-                output: data.content || data.result
-              }
-            }
-          };
-        case "error":
-          return {
-            type: "error",
-            error: data.error || data.message || "Unknown error"
-          };
-        case "complete":
-        case "message_stop":
-          return {
-            type: "complete",
-            content: data.content || "",
-            usage: data.usage ? {
-              input_tokens: data.usage.input_tokens || 0,
-              output_tokens: data.usage.output_tokens || 0,
-              total_tokens: data.usage.total_tokens || 0
-            } : void 0
-          };
-        case "usage":
-          return {
-            type: "usage",
-            usage: {
-              input_tokens: data.input_tokens || 0,
-              output_tokens: data.output_tokens || 0,
-              total_tokens: (data.input_tokens || 0) + (data.output_tokens || 0)
-            }
-          };
-        default:
-          if (data.text || data.content) {
-            return {
-              type: "text",
-              content: data.text || data.content
-            };
-          }
-          return null;
-      }
-    } catch {
-      if (line.trim()) {
-        return {
-          type: "text",
-          content: line + "\n"
-        };
-      }
-      return null;
-    }
   }
   async *consumeEvents(session) {
     while (!session.done || session.eventBuffer.length > 0) {
@@ -284,15 +192,12 @@ function createProtocol(context) {
     connectionMode: context.config.connectionMode || "local",
     sshHost: context.config.sshHost || "",
     sshUser: context.config.sshUser || "root",
-    sshKeyPath: context.config.sshKeyPath || "~/.ssh/id_rsa",
+    sshKeyPath: context.config.sshKeyPath || "",
     hermesBinary: context.config.hermesBinary || "hermes",
     hermesProfile: context.config.hermesProfile || "coder",
     workspacePath: context.workspacePath || ""
   };
-  console.log(`[Hermes Agent] Backend module loaded (mode: ${config.connectionMode})`);
-  if (config.connectionMode === "ssh" && !config.sshHost) {
-    console.warn("[Hermes Agent] SSH mode selected but no sshHost configured!");
-  }
+  console.log(`[Hermes Agent] Backend loaded (mode: ${config.connectionMode})`);
   return new HermesProtocol(config);
 }
 // Annotate the CommonJS export names for ESM import in node:
