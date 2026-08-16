@@ -1,0 +1,95 @@
+{
+  "id": "com.nimbalyst.hermes-agent",
+  "name": "Hermes Agent",
+  "version": "1.0.0",
+  "description": "Connect Hermes Agent as a coding agent provider with 70+ tools, 42 gateway platforms, and persistent memory. Communicates with Hermes via SSH or local CLI.",
+  "author": "Nimbalyst + Hermes",
+  "main": "dist/index.js",
+  "apiVersion": "1.0.0",
+  "defaultEnabled": false,
+  "contributions": {
+    "aiAgentProviders": [
+      {
+        "id": "hermes-agent",
+        "displayName": "Hermes Agent",
+        "platform": "hermes",
+        "backendModuleId": "hermes-backend",
+        "supportsResume": true,
+        "supportsForking": false,
+        "supportsAttachments": ["image", "file"],
+        "modelDiscovery": "dynamic",
+        "models": [
+          {
+            "id": "hermes-agent:mimo-v2.5-pro",
+            "name": "Xiaomi MiMo v2.5 Pro",
+            "default": true
+          },
+          {
+            "id": "hermes-agent:claude-sonnet-4",
+            "name": "Claude Sonnet 4"
+          },
+          {
+            "id": "hermes-agent:gpt-4o",
+            "name": "GPT-4o"
+          }
+        ],
+        "icon": "smart_toy",
+        "settingsPanelComponent": "HermesAgentSettings"
+      }
+    ],
+    "backendModules": [
+      {
+        "id": "hermes-backend",
+        "entry": "dist/agent.js",
+        "runtime": "utility-process",
+        "permissions": ["workspace-files", "nimbalyst-database-write"],
+        "enablement": {
+          "default": "disabled",
+          "promptOn": "firstUse",
+          "purpose": "Runs Hermes Agent via SSH or local CLI. Gives the agent workspace tools to read, write, and search files, run shell commands, access the Hermes memory system (Graphify, Codebase Memory), and use 70+ Hermes tools."
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Hermes Agent",
+      "properties": {
+        "connectionMode": {
+          "type": "string",
+          "enum": ["local", "ssh"],
+          "default": "local",
+          "description": "How to connect to Hermes. 'local' runs hermes locally, 'ssh' connects to a remote VPS."
+        },
+        "sshHost": {
+          "type": "string",
+          "default": "",
+          "description": "SSH host (e.g. 169.58.56.108). Only used when connectionMode is 'ssh'."
+        },
+        "sshUser": {
+          "type": "string",
+          "default": "root",
+          "description": "SSH user. Only used when connectionMode is 'ssh'."
+        },
+        "sshKeyPath": {
+          "type": "string",
+          "default": "~/.ssh/id_rsa",
+          "description": "Path to SSH private key. Only used when connectionMode is 'ssh'."
+        },
+        "hermesBinary": {
+          "type": "string",
+          "default": "hermes",
+          "description": "Path to hermes binary on the remote/local machine."
+        },
+        "hermesProfile": {
+          "type": "string",
+          "default": "coder",
+          "description": "Hermes profile to use (e.g. planner, coder, auditor)."
+        },
+        "workspacePath": {
+          "type": "string",
+          "default": "",
+          "description": "Remote workspace path. If empty, uses the current workspace."
+        }
+      }
+    }
+  }
+}

@@ -1,113 +1,129 @@
-# 🔀 Nimbalyst + Hermes — Plan Maestro de Integración
+# Nimbalyst + Hermes Agent Integration
 
-**Fecha:** 2026-08-16
-**Versión:** 2.0 (Extendido)
-**Objetivo:** Conectar Hermes Agent como backend de agentes dentro de Nimbalyst
+## 📋 Qué es esto
 
----
+Un **extension para Nimbalyst** que conecta Hermes Agent como proveedor de coding agent. Permite usar las 70+ herramientas de Hermes, los 42 gateway platforms, y el sistema de memoria desde la interfaz visual de Nimbalyst.
 
-## 📋 Resumen Ejecutivo
-
-**Decisión:** Modificar Nimbalyst + Conectar Hermes (Opción A)
-**Esfuerzo:** 6-8 semanas (8 fases)
-**Resultado:** Workspace visual con 70+ herramientas AI, 42 plataformas de gateway, memoria persistente, y colaboración real-time.
-
----
-
-## 🏗️ Arquitectura Final
+## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    NIMBALYST (Visual Workspace)                 │
-│                                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│  │ Editores │ │  Kanban  │ │  Tasks   │ │ Terminal │         │
-│  │ (10)     │ │  (3)     │ │  (4)     │ │ Ghostty  │         │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘         │
-│       │             │             │             │               │
-│       └─────────────┴──────┬──────┴─────────────┘               │
-│                            │                                    │
-│                   ┌────────┴────────┐                           │
-│                   │  HERMES PROVIDER │                          │
-│                   │  (AI Provider)   │                          │
-│                   └────────┬────────┘                           │
-│                            │                                    │
-│  ┌─────────────────────────┼─────────────────────────┐         │
-│  │                         │                         │         │
-│  ▼                         ▼                         ▼         │
-│ ┌──────────┐       ┌──────────┐              ┌──────────┐     │
-│ │ Tools    │       │ Gateway  │              │  Memory  │     │
-│ │ Bridge   │       │ Bridge   │              │  Bridge  │     │
-│ │ (70+)    │       │ (42 plat)│              │(Graphify)│     │
-│ └──────────┘       └──────────┘              └──────────┘     │
-│                                                                 │
-│  ┌──────────┐       ┌──────────┐              ┌──────────┐     │
-│ │ Skills   │       │   MCP    │              │   Cron   │     │
-│ │ Extension│       │  Server  │              │  Bridge  │     │
-│ └──────────┘       └──────────┘              └──────────┘     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    HERMES AGENT (Backend)                       │
-│                                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│  │  Tools   │ │ Gateway  │ │  Memory  │ │  Skills  │         │
-│  │  (70+)   │ │ (42 plat)│ │(Graphify)│ │  (60+)   │         │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │
-│                                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│  │   MCP    │ │   Cron   │ │ Profiles │ │   Code   │         │
-│  │ Servers  │ │  Jobs    │ │  System  │ │   RAG    │         │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Tu PC (Nimbalyst)  ←→  VPS (Hermes Agent)
+   │                        │
+   │  SSH / CLI              │
+   │                        │
+   ├─ Editores visuales     ├─ 70+ herramientas
+   ├─ Kanban board          ├─ 42 plataformas gateway
+   ├─ Task tracking         ├─ Graphify (knowledge graph)
+   ├─ Real-time collab      ├─ Codebase Memory
+   └─ Mobile apps           └─ Code RAG
 ```
 
----
+## 📦 Instalación
 
-## 📅 Fases de Implementación
+### 1. Instalar Nimbalyst
 
-### Fase 1: Hermes AI Provider (Semana 1)
-**Objetivo:** Conectar Hermes como un agente más dentro de Nimbalyst.
+```bash
+# Descargar Nimbalyst desde https://nimbalyst.com
+# O compilar desde source:
+git clone https://github.com/nimbalyst/nimbalyst.git
+cd nimbalyst
+npm install
+cd packages/electron && npm run dev
+```
 
-### Fase 2: Exponer Herramientas (Semana 2)
-**Objetivo:** Las 70+ herramientas de Hermes disponibles en Nimbalyst.
+### 2. Instalar el Extension Hermes Agent
 
-### Fase 3: Gateway Bridge (Semana 3)
-**Objetivo:** Los 42 canales de gateway de Hermes accesibles desde Nimbalyst.
+```bash
+# Clonar este repo
+git clone https://github.com/goldenigh1423/nimbalyst-hermes.git
+cd nimbalyst-hermes
 
-### Fase 4: Shared Memory (Semana 3-4)
-**Objetivo:** Sistema de memoria de Hermes accesible desde Nimbalyst.
+# Copiar el extension al directorio de extensiones de Nimbalyst
+cp -r code/hermes-agent-nimbalyst/ ~/.nimbalyst/extensions/hermes-agent/
 
-### Fase 5: Skills como Extensiones (Semana 4)
-**Objetivo:** Skills de Hermes convertidos a extensiones de Nimbalyst.
+# O si compilas Nimbalyst desde source:
+cp -r code/hermes-agent-nimbalyst/ /ruta/a/nimbalyst/packages/extensions/hermes-agent/
+```
 
-### Fase 6: MCP Integration (Semana 5)
-**Objetivo:** Servidores MCP de Hermes accesibles desde Nimbalyst.
+### 3. Configurar la Conexión SSH al VPS
 
-### Fase 7: Scheduled Jobs / Cron (Semana 6)
-**Objetivo:** Sistema de cron de Hermes accesible desde Nimbalyst.
+En Nimbalyst, ir a **Settings → Extensions → Hermes Agent**:
 
-### Fase 8: Desktop Feature Parity (Semana 7-8)
-**Objetivo:** Funciones del desktop de Hermes que faltan en Nimbalyst.
+| Campo | Valor |
+|-------|-------|
+| Connection Mode | `ssh` |
+| SSH Host | `169.58.56.108` |
+| SSH User | `root` |
+| SSH Key Path | `~/.ssh/id_rsa` (tu clave SSH) |
+| Hermes Binary | `hermes` |
+| Hermes Profile | `coder` |
 
----
+### 4. Verificar SSH
 
-## 📊 Estado Actual
+```bash
+# Test de conexión SSH desde tu PC
+ssh root@169.58.56.108 "hermes --version"
 
-| Fase | Estado | Archivo |
-|------|--------|---------|
-| 1. Hermes AI Provider | ⏳ Pendiente | `phases/01-hermes-provider.md` |
-| 2. Exponer Herramientas | ⏳ Pendiente | `phases/02-tool-bridge.md` |
-| 3. Gateway Bridge | ⏳ Pendiente | `phases/03-gateway-bridge.md` |
-| 4. Shared Memory | ⏳ Pendiente | `phases/04-shared-memory.md` |
-| 5. Skills como Extensiones | ⏳ Pendiente | `phases/05-skills-extensions.md` |
-| 6. MCP Integration | ⏳ Pendiente | `phases/06-mcp-integration.md` |
-| 7. Scheduled Jobs | ⏳ Pendiente | `phases/07-cron-bridge.md` |
-| 8. Desktop Feature Parity | ⏳ Pendiente | `phases/08-desktop-features.md` |
+# Debería mostrar:
+# Hermes Agent v0.20.1 (2026.8.13)
+```
 
----
+### 5. Usar
 
-*Plan en progreso — subagente comparando desktop features*
+1. Abrir Nimbalyst
+2. Crear nueva sesión de coding agent
+3. Seleccionar **"Hermes Agent"** como provider
+4. Seleccionar modelo (MiMo v2.5 Pro, Claude, GPT-4o)
+5. ¡Escribir y que Hermes trabaje!
+
+## 📁 Estructura del Extension
+
+```
+hermes-agent-nimbalyst/
+├── manifest.json          # Declaración del extension
+├── package.json           # Dependencias
+├── tsconfig.json          # Config TypeScript
+└── src/
+    ├── index.tsx           # Entry point (frontend)
+    ├── agent.ts            # Backend (AgentProtocol + SSH)
+    └── components/
+        └── HermesAgentSettings.tsx  # Panel de configuración
+```
+
+## 🔧 Modos de Conexión
+
+### Modo Local
+Hermes instalado localmente en tu PC:
+```
+connectionMode: "local"
+hermesBinary: "hermes"
+```
+
+### Modo SSH (Recomendado)
+Hermes corriendo en el VPS:
+```
+connectionMode: "ssh"
+sshHost: "169.58.56.108"
+sshUser: "root"
+sshKeyPath: "~/.ssh/id_rsa"
+```
+
+## 📊 Plan de Desarrollo
+
+| Fase | Estado | Descripción |
+|------|--------|-------------|
+| 1. HermesProvider | ✅ | Extension con AgentProtocol + SSH |
+| 2. Tool Bridge | ⏳ | 70+ herramientas de Hermes |
+| 3. Gateway Bridge | ⏳ | 42 plataformas de gateway |
+| 4. Shared Memory | ⏳ | Graphify + Codebase Memory |
+| 5. Skills | ⏳ | Skills como extensiones |
+| 6. MCP Integration | ⏳ | Servidores MCP |
+| 7. Cron Bridge | ⏳ | Scheduled jobs |
+| 8. Desktop Features | ⏳ | HUD, Quick Entry, etc. |
+| 9. Database Integration | ⏳ | PostgreSQL AIOS |
+
+## 🔗 Links
+
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+- [Nimbalyst](https://github.com/nimbalyst/nimbalyst)
+- [Documentación Hermes](https://hermes-agent.nousresearch.com/docs/)
