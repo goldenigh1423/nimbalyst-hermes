@@ -2,25 +2,20 @@
  * Hermes Agent Backend Module
  *
  * Backend module entry point for the hermes-agent extension.
- * Compiled to dist/agent.js. The host loads this and calls activate(ctx).
- *
- * Follows the same pattern as gemini-antigravity extension.
+ * Compiled to dist/agent.js.
  */
 
 import { spawn, ChildProcess } from 'child_process';
 
 // ============================================
-// Types (inline to avoid import issues)
+// Types
 // ============================================
 
 interface BackendActivateContext {
   extensionId: string;
   config: Record<string, unknown>;
   workspacePath: string;
-  runtimeContext?: {
-    extensionId?: string;
-    logger?: any;
-  };
+  runtimeContext?: { extensionId?: string; logger?: any };
   logger?: any;
 }
 
@@ -43,35 +38,24 @@ interface SendMessageInput {
   sessionId: string;
   content: string;
   attachments?: any[];
+  abortSignal?: AbortSignal;
+}
+
+interface ProtocolEvent {
+  type: 'text' | 'tool_call' | 'tool_result' | 'error' | 'complete' | 'usage' | 'reasoning';
+  content?: string;
+  toolCall?: { id?: string; name: string; arguments?: any; result?: any };
+  toolResult?: { id?: string; name: string; result?: any };
+  error?: string;
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
 }
 
 interface BackendModuleApi {
   createSession(input: CreateSessionInput): Promise<void>;
   resumeSession(input: ResumeSessionInput): Promise<void>;
-  sendMessage(
-    input: SendMessageInput,
-    callbacks: {
-      onText?: (text: string) => void;
-      onToolCall?: (name: string, args: any) => void;
-      onToolResult?: (name: string, result: any) => void;
-      onComplete?: (usage?: any) => void;
-      onError?: (error: string) => void;
-    }
-  ): Promise<void>;
+  sendMessage(input: SendMessageInput): AsyncIterable<ProtocolEvent>;
   abortSession(sessionId: string): void;
   cleanupSession(sessionId: string): void;
-}
-
-// ============================================
-// Session State
-// ============================================
-
-interface SessionState {
-  sessionId: string;
-  workspacePath?: string;
-  modelKey: string;
-  process: ChildProcess | null;
-  abortController: AbortController | null;
 }
 
 // ============================================
@@ -108,184 +92,147 @@ async function activate(ctx: BackendActivateContext): Promise<{ methods: Backend
   const extensionId = ctx.runtimeContext?.extensionId ?? ctx.extensionId;
   const config = resolveConfig(ctx);
 
-  log.info?.(
-    `[hermes-backend] activated extensionId=${extensionId} mode=${config.connectionMode} host=${config.sshHost}`
-  );
+  log.info?.(`[hermes-backend] activated mode=${config.connectionMode} host=${config.sshHost}`);
 
-  const sessions = new Map<string, SessionState>();
+  const sessions = new Map<string, { sessionId: string; workspacePath?: string; process: ChildProcess | null }>();
 
-  function getOrThrow(sessionId: string): SessionState {
+  function getOrThrow(sessionId: string) {
     const s = sessions.get(sessionId);
     if (!s) throw new Error(`[hermes-backend] session ${sessionId} not found`);
     return s;
   }
 
-  function spawnHermes(
-    session: SessionState,
-    message: string,
-    callbacks: {
-      onText?: (text: string) => void;
-      onToolCall?: (name: string, args: any) => void;
-      onToolResult?: (name: string, result: any) => void;
-      onComplete?: (usage?: any) => void;
-      onError?: (error: string) => void;
-    }
-  ): ChildProcess {
-    let proc: ChildProcess;
-
-    if (config.connectionMode === 'ssh') {
-      const escapedMessage = message.replace(/'/g, "'\\''");
-      const hermesCmd = `${config.hermesBinary} chat -q '${escapedMessage}' -p ${config.hermesProfile}`;
-
-      const sshArgs = [
-        '-o', 'StrictHostKeyChecking=no',
-        '-o', 'ConnectTimeout=10',
-      ];
-
-      if (config.sshKeyPath) {
-        sshArgs.push('-i', config.sshKeyPath);
-      }
-
-      sshArgs.push(`${config.sshUser}@${config.sshHost}`, hermesCmd);
-
-      log.info?.(`[hermes-backend] SSH: ssh ${sshArgs.join(' ')}`);
-      proc = spawn('ssh', sshArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-    } else {
-      const args = ['chat', '-q', message, '-p', config.hermesProfile];
-      if (session.workspacePath) {
-        args.push('--in', session.workspacePath);
-      }
-
-      log.info?.(`[hermes-backend] Local: ${config.hermesBinary} ${args.join(' ')}`);
-      proc = spawn(config.hermesBinary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
-    }
-
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
-
-    proc.stdout?.on('data', (data: Buffer) => {
-      stdoutBuffer += data.toString();
-    });
-
-    proc.stderr?.on('data', (data: Buffer) => {
-      stderrBuffer += data.toString();
-    });
-
-    proc.on('exit', (code: number | null) => {
-      log.info?.(`[hermes-backend] Process exited with code ${code}`);
-
-      if (stdoutBuffer.trim()) {
-        callbacks.onText?.(stdoutBuffer);
-      }
-
-      if (stderrBuffer.trim()) {
-        // Only send stderr if it looks like an error
-        if (code !== 0 || stderrBuffer.includes('Error') || stderrBuffer.includes('error')) {
-          callbacks.onError?.(stderrBuffer);
-        } else {
-          callbacks.onText?.(stderrBuffer);
-        }
-      }
-
-      callbacks.onComplete?.({
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0,
-      });
-    });
-
-    proc.on('error', (error: Error) => {
-      log.error?.(`[hermes-backend] Process error:`, error);
-      callbacks.onError?.(error.message);
-    });
-
-    return proc;
-  }
-
   const api: BackendModuleApi = {
     async createSession(input: CreateSessionInput): Promise<void> {
       log.info?.(`[hermes-backend] createSession: ${input.sessionId}`);
-
-      // Kill existing session if any
       const existing = sessions.get(input.sessionId);
-      if (existing?.process) {
-        existing.process.kill('SIGTERM');
-      }
-
+      if (existing?.process) existing.process.kill('SIGTERM');
       sessions.set(input.sessionId, {
         sessionId: input.sessionId,
         workspacePath: input.workspacePath,
-        modelKey: input.model || 'default',
         process: null,
-        abortController: null,
       });
     },
 
     async resumeSession(input: ResumeSessionInput): Promise<void> {
-      log.info?.(`[hermes-backend] resumeSession: ${input.sessionId}`);
-
       if (!sessions.has(input.sessionId)) {
-        // Create if not exists
-        await api.createSession({
-          sessionId: input.sessionId,
-          workspacePath: input.workspacePath,
-          model: input.model,
-        });
+        await api.createSession({ sessionId: input.sessionId, workspacePath: input.workspacePath, model: input.model });
       }
     },
 
-    async sendMessage(
-      input: SendMessageInput,
-      callbacks: {
-        onText?: (text: string) => void;
-        onToolCall?: (name: string, args: any) => void;
-        onToolResult?: (name: string, result: any) => void;
-        onComplete?: (usage?: any) => void;
-        onError?: (error: string) => void;
-      }
-    ): Promise<void> {
+    sendMessage(input: SendMessageInput): AsyncIterable<ProtocolEvent> {
       const session = getOrThrow(input.sessionId);
-      log.info?.(`[hermes-backend] sendMessage to ${input.sessionId}: ${input.content.substring(0, 50)}...`);
+      log.info?.(`[hermes-backend] sendMessage: ${input.content.substring(0, 80)}`);
 
-      // Abort previous if running
+      // Kill previous process if running
       if (session.process) {
         session.process.kill('SIGINT');
         session.process = null;
       }
 
-      const abortController = new AbortController();
-      session.abortController = abortController;
+      // Spawn hermes
+      let proc: ChildProcess;
+      if (config.connectionMode === 'ssh') {
+        const escaped = input.content.replace(/'/g, "'\\''");
+        const cmd = `${config.hermesBinary} chat -q '${escaped}' -p ${config.hermesProfile}`;
+        const args = ['-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10'];
+        if (config.sshKeyPath) args.push('-i', config.sshKeyPath);
+        args.push(`${config.sshUser}@${config.sshHost}`, cmd);
+        proc = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      } else {
+        const args = ['chat', '-q', input.content, '-p', config.hermesProfile];
+        if (session.workspacePath) args.push('--in', session.workspacePath);
+        proc = spawn(config.hermesBinary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      }
+      session.process = proc;
 
-      // Spawn hermes with the message
-      session.process = spawnHermes(session, input.content, callbacks);
+      // Return async iterable
+      return createEventStream(proc, input.abortSignal);
     },
 
     abortSession(sessionId: string): void {
       const session = sessions.get(sessionId);
-      if (session) {
-        log.info?.(`[hermes-backend] abortSession: ${sessionId}`);
-        session.abortController?.abort();
-        if (session.process) {
-          session.process.kill('SIGINT');
-          session.process = null;
-        }
+      if (session?.process) {
+        session.process.kill('SIGINT');
+        session.process = null;
       }
     },
 
     cleanupSession(sessionId: string): void {
       const session = sessions.get(sessionId);
-      if (session) {
-        log.info?.(`[hermes-backend] cleanupSession: ${sessionId}`);
-        if (session.process) {
-          session.process.kill('SIGTERM');
-          session.process = null;
-        }
-        sessions.delete(sessionId);
+      if (session?.process) {
+        session.process.kill('SIGTERM');
+        session.process = null;
       }
+      sessions.delete(sessionId);
     },
   };
 
   return { methods: api };
+}
+
+// ============================================
+// Event Stream
+// ============================================
+
+function createEventStream(proc: ChildProcess, abortSignal?: AbortSignal): AsyncIterable<ProtocolEvent> {
+  const buffer: ProtocolEvent[] = [];
+  let resolve: (() => void) | null = null;
+  let done = false;
+
+  let stdout = '';
+  let stderr = '';
+
+  proc.stdout?.on('data', (data: Buffer) => {
+    stdout += data.toString();
+  });
+
+  proc.stderr?.on('data', (data: Buffer) => {
+    stderr += data.toString();
+  });
+
+  proc.on('exit', (code: number | null) => {
+    // Send accumulated output as text
+    if (stdout.trim()) {
+      buffer.push({ type: 'text', content: stdout });
+    }
+    if (stderr.trim() && code !== 0) {
+      buffer.push({ type: 'error', error: stderr });
+    }
+    buffer.push({
+      type: 'complete',
+      usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+    });
+    done = true;
+    resolve?.();
+  });
+
+  proc.on('error', (error: Error) => {
+    buffer.push({ type: 'error', error: error.message });
+    done = true;
+    resolve?.();
+  });
+
+  // Handle abort signal
+  abortSignal?.addEventListener('abort', () => {
+    proc.kill('SIGINT');
+  });
+
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        async next() {
+          while (!done || buffer.length > 0) {
+            if (buffer.length > 0) {
+              return { value: buffer.shift()!, done: false };
+            }
+            await new Promise<void>(r => { resolve = r; });
+          }
+          return { value: undefined, done: true };
+        },
+      };
+    },
+  };
 }
 
 // ============================================
