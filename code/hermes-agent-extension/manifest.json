@@ -1,0 +1,131 @@
+{
+  "id": "com.nimbalyst.hermes-agent",
+  "name": "Hermes Agent",
+  "version": "1.0.0",
+  "description": "Connect Hermes Agent as AI provider with 70+ tools, 42 gateway platforms, and persistent memory",
+  "author": "Nimbalyst + Hermes Team",
+  "main": "dist/index.js",
+  "styles": "dist/index.css",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "filesystem": true,
+    "ai": true,
+    "network": true
+  },
+  "contributions": {
+    "agentProviders": [{
+      "id": "hermes",
+      "backendModuleId": "hermes-backend",
+      "displayName": "Hermes Agent",
+      "icon": "smart_toy",
+      "description": "AI agent with 70+ tools and 42 gateway platforms"
+    }],
+    "panels": [
+      {
+        "id": "hermes-config",
+        "title": "Hermes Config",
+        "icon": "settings",
+        "placement": "sidebar",
+        "component": "HermesConfigPanel"
+      },
+      {
+        "id": "hermes-gateway",
+        "title": "Hermes Gateway",
+        "icon": "lan",
+        "placement": "sidebar",
+        "component": "HermesGatewayPanel"
+      },
+      {
+        "id": "hermes-memory",
+        "title": "Hermes Memory",
+        "icon": "memory",
+        "placement": "sidebar",
+        "component": "HermesMemoryPanel"
+      }
+    ],
+    "aiTools": [
+      "hermes.web_search",
+      "hermes.web_extract",
+      "hermes.terminal",
+      "hermes.read_file",
+      "hermes.write_file",
+      "hermes.patch",
+      "hermes.search_files",
+      "hermes.execute_code",
+      "hermes.memory",
+      "hermes.session_search",
+      "hermes.skills_list",
+      "hermes.skill_view",
+      "hermes.skill_manage",
+      "hermes.cronjob",
+      "hermes.delegate_task"
+    ],
+    "slashCommands": [
+      {
+        "id": "hermes.status",
+        "title": "Hermes Status",
+        "handler": "handleHermesStatus"
+      },
+      {
+        "id": "hermes.skills",
+        "title": "Hermes Skills",
+        "handler": "handleHermesSkills"
+      },
+      {
+        "id": "hermes.memory",
+        "title": "Hermes Memory",
+        "handler": "handleHermesMemory"
+      },
+      {
+        "id": "hermes.gateway",
+        "title": "Hermes Gateway",
+        "handler": "handleHermesGateway"
+      },
+      {
+        "id": "hermes.cron",
+        "title": "Hermes Cron",
+        "handler": "handleHermesCron"
+      }
+    ],
+    "configuration": {
+      "properties": {
+        "hermes.path": {
+          "type": "string",
+          "default": "hermes",
+          "description": "Path to hermes binary"
+        },
+        "hermes.profile": {
+          "type": "string",
+          "default": "default",
+          "description": "Hermes profile to use"
+        },
+        "hermes.mode": {
+          "type": "string",
+          "enum": ["cli", "api", "mcp"],
+          "default": "cli",
+          "description": "Communication mode with Hermes"
+        },
+        "hermes.api.url": {
+          "type": "string",
+          "default": "http://localhost:9119",
+          "description": "Hermes API URL (for API mode)"
+        },
+        "hermes.gateway.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable gateway bridge"
+        },
+        "hermes.memory.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable memory bridge"
+        }
+      }
+    }
+  },
+  "marketplace": {
+    "categories": ["ai", "agents", "productivity"],
+    "tags": ["hermes", "ai-agent", "gateway", "memory", "skills"],
+    "screenshots": []
+  }
+}
